@@ -11,7 +11,6 @@ ehthumbs.db
 desktop.ini
 
 # Common dependency folders (uncomment the ones you need)
-
 node_modules/
 bower_components/
 vendor/
