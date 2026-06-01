@@ -7,7 +7,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install production deps only
-RUN npm ci --omit=dev
+RUN npm install --omit=dev
 
 # Copy source
 COPY index.js ./
