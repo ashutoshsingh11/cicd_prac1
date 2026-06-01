@@ -34,8 +34,7 @@ jobs:
         run: npm test
 
   # ─────────────────────────────────────────────────────────────────────────────
-  # JOB 2 ── Build & Push to GHCR (GitHub Container Registry)
-  # Auth: GITHUB_TOKEN — auto-injected, no secrets needed
+  # JOB 2 ── Build & Push to GHCR
   # ─────────────────────────────────────────────────────────────────────────────
   build-and-push:
     name: Build & Push Docker Image
@@ -45,10 +44,7 @@ jobs:
 
     permissions:
       contents: read
-      packages: write # allows push to ghcr.io
-
-    outputs:
-      image_tag: ${{ steps.meta.outputs.version }}
+      packages: write
 
     steps:
       - name: Checkout code
@@ -57,7 +53,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # Authenticate using the auto-provided GITHUB_TOKEN — no secrets to configure
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -86,7 +81,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   # ─────────────────────────────────────────────────────────────────────────────
-  # JOB 3 ── Smoke Test the pushed image
+  # JOB 3 ── Smoke Test
   # ─────────────────────────────────────────────────────────────────────────────
   smoke-test:
     name: Smoke Test Container
@@ -134,11 +129,7 @@ jobs:
         run: docker rm -f smoke || true
 
   # ─────────────────────────────────────────────────────────────────────────────
-  # JOB 4 ── Deploy to EC2 via SSH
-  # Secrets needed (repo Settings → Secrets → Actions):
-  #   EC2_HOST       → your EC2 public IP
-  #   EC2_USER       → ubuntu  (or ec2-user for Amazon Linux)
-  #   EC2_SSH_KEY    → full contents of your .pem file
+  # JOB 4 ── Deploy to EC2
   # ─────────────────────────────────────────────────────────────────────────────
   deploy:
     name: Deploy to EC2
@@ -147,24 +138,40 @@ jobs:
     if: github.event_name == 'push'
 
     steps:
+      # ── Debug: verify secrets have no hidden chars ──────────────────────
+      - name: Debug EC2 host secret
+        run: |
+          echo "Host length: ${#HOST}"
+          echo "Host value: '${HOST}'"
+          echo "User value: '${USER}'"
+          echo "Key length: ${#KEY}"
+          echo "Key first line: $(echo "$KEY" | head -1)"
+          echo "Key line count: $(echo "$KEY" | wc -l)"
+        env:
+          HOST: ${{ secrets.EC2_HOST }}
+          USER: ${{ secrets.EC2_USER }}
+          KEY: ${{ secrets.EC2_SSH_KEY }}
+
+      # ── Debug: test TCP reachability on port 22 ─────────────────────────
+      - name: Test port 22 reachability
+        run: |
+          nc -zv ${{ secrets.EC2_HOST }} 22 && echo "✅ Port 22 reachable" || echo "❌ Port 22 NOT reachable"
+
+      # ── Deploy via SSH ───────────────────────────────────────────────────
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
+          timeout: 60s
+          command_timeout: 10m
+          debug: true
           script: |
-            # Pull latest code
             cd ~/cicd_prac1
             git pull origin main
-
-            # Log in to GHCR on the EC2 instance using a scoped token
-            # echo "${{ secrets.GITHUB_TOKEN }}" | \
-            #   sudo docker login ghcr.io -u ${{ github.actor }} --password-stdin
-
-            # Pull the latest image and restart
             sudo docker compose pull
             sudo docker compose down
             sudo docker compose up -d
-
             echo "✅ Deployed successfully on EC2"
