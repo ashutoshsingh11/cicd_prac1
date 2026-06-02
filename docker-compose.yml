@@ -1,8 +1,7 @@
 services:
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ghcr.io/ashutoshsingh11/hello-docker-backend:latest
+    pull_policy: always
     container_name: hello-docker-backend
     ports:
       - "3000:3000"

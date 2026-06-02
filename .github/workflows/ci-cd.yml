@@ -81,7 +81,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   # ─────────────────────────────────────────────────────────────────────────────
-  # JOB 3 ── Smoke Test (Cleaned & Fixed)
+  # JOB 3 ── Smoke Test
   # ─────────────────────────────────────────────────────────────────────────────
   smoke-test:
     name: Smoke Test Container
@@ -100,7 +100,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Pull and run container locally on runner
+      - name: Pull and run container
         run: |
           docker run -d \
             --name smoke \
@@ -116,12 +116,11 @@ jobs:
             sleep 2
           done
 
-      - name: Hit the local endpoint
+      - name: Hit the endpoint
         run: |
           RESPONSE=$(curl -sf http://localhost:3000)
           echo "Response: $RESPONSE"
-          # Modified to match general responses if "Hello from Docker" isn't exact
-          echo "$RESPONSE" \
+          echo "$RESPONSE" | grep -q "Hello from Docker" \
             && echo "✅ Smoke test passed!" \
             || (echo "❌ Smoke test FAILED"; exit 1)
 
@@ -131,6 +130,7 @@ jobs:
 
   # ─────────────────────────────────────────────────────────────────────────────
   # JOB 4 ── Deploy to EC2
+  # No login needed — GHCR package is public
   # ─────────────────────────────────────────────────────────────────────────────
   deploy:
     name: Deploy to EC2
@@ -139,23 +139,6 @@ jobs:
     if: github.event_name == 'push'
 
     steps:
-      # ── Debug: verify secrets have no hidden chars ──────────────────────
-      - name: Debug EC2 host secret
-        run: |
-          echo "Host length: ${#HOST}"
-          echo "User value: '${USER}'"
-          echo "Key line count: $(echo "$KEY" | wc -l)"
-        env:
-          HOST: ${{ secrets.EC2_HOST }}
-          USER: ${{ secrets.EC2_USER }}
-          KEY: ${{ secrets.EC2_SSH_KEY }}
-
-      # ── Debug: test TCP reachability on port 22 ─────────────────────────
-      - name: Test port 22 reachability
-        run: |
-          nc -zv -w5 ${{ secrets.EC2_HOST }} 22 && echo "✅ Port 22 reachable" || echo "❌ Port 22 NOT reachable"
-
-      # ── Deploy via SSH ───────────────────────────────────────────────────
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -165,10 +148,8 @@ jobs:
           port: 22
           timeout: 45s
           command_timeout: 10m
-          debug: true
           script: |
             cd ~/cicd_prac1
-            git pull origin main
             sudo docker compose pull
             sudo docker compose down
             sudo docker compose up -d
