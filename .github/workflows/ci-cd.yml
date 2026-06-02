@@ -116,6 +116,14 @@ jobs:
             sleep 2
           done
 
+      - name: Test SSH connection
+          run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key
+         chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          ssh -i ~/.ssh/deploy_key -v ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "echo SSH connection successful"    
+
       - name: Hit the endpoint
         run: |
           RESPONSE=$(curl -sf http://localhost:3000)
