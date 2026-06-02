@@ -26,7 +26,7 @@ const server = http.createServer((req, res) => {
   }
 
   const currentTime = getISTTime();
-  const message = `Hello from Docker  ${currentTime}`;
+  const message = `Hello from Docker V2  ${currentTime}`;
 
   res.writeHead(200, { "Content-Type": "text/plain" });
   res.end(message);
